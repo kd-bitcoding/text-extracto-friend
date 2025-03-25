@@ -1,14 +1,15 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, MessageSquare, Trash2, Search, Filter } from "lucide-react";
+import { Clock, MessageSquare, Trash2, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { chatService, ChatSession } from "@/services/chatService";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -18,11 +19,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Loader2 } from "lucide-react";
 
-// Helper function moved outside of components to be accessible to both
-const formatDate = (date: Date) => {
+// Helper function for formatting dates
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr);
   const now = new Date();
   const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
   
@@ -35,57 +37,42 @@ const formatDate = (date: Date) => {
   }
 };
 
-// Mock chat session data - would come from API in real app
-const mockChatSessions = [
-  {
-    id: "1",
-    title: "Receipt from Restaurant",
-    date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
-    messageCount: 8,
-    lastMessage: "What was the total amount on the receipt?",
-  },
-  {
-    id: "2",
-    title: "Business Card",
-    date: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-    messageCount: 5,
-    lastMessage: "What's the email address on this card?",
-  },
-  {
-    id: "3",
-    title: "Meeting Notes",
-    date: new Date(Date.now() - 1000 * 60 * 60 * 3), // 3 hours ago
-    messageCount: 12,
-    lastMessage: "When is the next meeting scheduled?",
-  },
-  {
-    id: "4",
-    title: "Product Invoice",
-    date: new Date(Date.now() - 1000 * 60 * 60 * 5), // 5 hours ago
-    messageCount: 7,
-    lastMessage: "Can you list all the items on this invoice?",
-  },
-  {
-    id: "5",
-    title: "Train Ticket",
-    date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3), // 3 days ago
-    messageCount: 4,
-    lastMessage: "What's the departure time for this train?",
-  },
-];
-
 const History: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [sessions, setSessions] = useState(mockChatSessions);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const sessionsPerPage = 6;
 
+  // Fetch chat sessions when component mounts
+  useEffect(() => {
+    const fetchSessions = async () => {
+      if (isAuthenticated) {
+        try {
+          setIsLoading(true);
+          const data = await chatService.getSessions();
+          setSessions(data);
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to load chat history",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchSessions();
+  }, [isAuthenticated, toast]);
+
   // Show loading state if auth is still being determined
-  if (isLoading) {
+  if (authLoading) {
     return <div>Loading...</div>;
   }
 
@@ -97,7 +84,7 @@ const History: React.FC = () => {
   // Filter sessions based on search query
   const filteredSessions = sessions.filter(session => 
     session.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    session.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
+    (session.messages.length > 0 && session.messages[session.messages.length - 1].content.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Paginate sessions
@@ -107,7 +94,6 @@ const History: React.FC = () => {
   const totalPages = Math.ceil(filteredSessions.length / sessionsPerPage);
 
   const handleContinueChat = (sessionId: string) => {
-    // In a real app, this would load the chat session data
     navigate(`/chat?session=${sessionId}`);
     toast({
       title: "Loading chat session",
@@ -115,15 +101,23 @@ const History: React.FC = () => {
     });
   };
 
-  const handleDeleteChat = (sessionId: string) => {
-    // Filter out the deleted session
-    setSessions(sessions.filter(session => session.id !== sessionId));
-    setSessionToDelete(null);
-    
-    toast({
-      title: "Chat session deleted",
-      description: "The chat session has been removed from your history.",
-    });
+  const handleDeleteChat = async (sessionId: string) => {
+    try {
+      await chatService.deleteSession(sessionId);
+      setSessions(prevSessions => prevSessions.filter(session => session.id !== sessionId));
+      setSessionToDelete(null);
+      
+      toast({
+        title: "Chat session deleted",
+        description: "The chat session has been removed from your history.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete chat session",
+        variant: "destructive",
+      });
+    }
   };
 
   const handlePageChange = (page: number) => {
@@ -143,7 +137,12 @@ const History: React.FC = () => {
             </p>
           </div>
           
-          {sessions.length > 0 ? (
+          {isLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2 text-lg">Loading chat history...</span>
+            </div>
+          ) : sessions.length > 0 ? (
             <>
               <div className="mb-6">
                 <div className="relative w-full max-w-md mx-auto">
@@ -258,18 +257,17 @@ const History: React.FC = () => {
 };
 
 interface ChatSessionProps {
-  session: {
-    id: string;
-    title: string;
-    date: Date;
-    messageCount: number;
-    lastMessage: string;
-  };
+  session: ChatSession;
   onContinue: () => void;
   onDelete: () => void;
 }
 
 const ChatSessionCard: React.FC<ChatSessionProps> = ({ session, onContinue, onDelete }) => {
+  // Get the last message for display
+  const lastMessage = session.messages.length > 0 
+    ? session.messages[session.messages.length - 1].content
+    : "No messages yet";
+
   return (
     <Card className="h-full flex flex-col hover:shadow-md transition-shadow duration-200">
       <CardHeader>
@@ -289,17 +287,17 @@ const ChatSessionCard: React.FC<ChatSessionProps> = ({ session, onContinue, onDe
         </div>
         <div className="flex items-center text-xs text-muted-foreground">
           <Clock className="h-3 w-3 mr-1" />
-          <span>{formatDate(session.date)}</span>
+          <span>{formatDate(session.updatedAt)}</span>
         </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col">
         <p className="text-sm mb-2 line-clamp-2 text-muted-foreground flex-1">
-          {session.lastMessage}
+          {lastMessage}
         </p>
         <div className="flex justify-between items-center mt-4">
           <div className="flex items-center text-xs text-muted-foreground">
             <MessageSquare className="h-3 w-3 mr-1" />
-            <span>{session.messageCount} messages</span>
+            <span>{session.messages.length} messages</span>
           </div>
           <Button 
             variant="outline" 

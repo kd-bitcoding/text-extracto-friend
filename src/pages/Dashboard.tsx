@@ -1,12 +1,17 @@
 
-import React from "react";
-import { Navigate } from "react-router-dom";
+import React, { useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/layout/Header";
 import ImageUploader from "@/components/dashboard/ImageUploader";
+import { useToast } from "@/hooks/use-toast";
+import { chatService } from "@/services/chatService";
 
 const Dashboard: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Show loading state if auth is still being determined
   if (isLoading) {
@@ -17,6 +22,46 @@ const Dashboard: React.FC = () => {
   if (!isAuthenticated) {
     return <Navigate to="/" replace />;
   }
+
+  const handleExtractionComplete = async (result: {
+    imageUrl: string;
+    extractedText: string;
+    title: string;
+  }) => {
+    try {
+      setIsProcessing(true);
+      
+      // Create a new chat session with the extracted text
+      const session = await chatService.createSession(
+        result.title,
+        result.extractedText,
+        result.imageUrl
+      );
+      
+      // Add a system message explaining what was extracted
+      await chatService.addMessage(
+        session.id,
+        `I've extracted the text from your image. You can now ask me questions about it.`,
+        'assistant'
+      );
+      
+      toast({
+        title: "Text Extracted Successfully",
+        description: "Your image has been processed and a new chat session created.",
+      });
+      
+      // Redirect to the chat page with the new session
+      navigate(`/chat?session=${session.id}`);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to process the image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
@@ -31,7 +76,7 @@ const Dashboard: React.FC = () => {
             </p>
           </div>
           
-          <ImageUploader />
+          <ImageUploader onExtractComplete={handleExtractionComplete} />
         </div>
       </main>
       
