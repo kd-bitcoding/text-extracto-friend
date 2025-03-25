@@ -3,7 +3,7 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { LogOut, User } from "lucide-react";
+import { LogOut, User, History } from "lucide-react";
 
 const Header: React.FC = () => {
   const { isAuthenticated, user, logout } = useAuth();
@@ -28,6 +28,9 @@ const Header: React.FC = () => {
               </NavLink>
               <NavLink to="/chat" current={location.pathname}>
                 Chats
+              </NavLink>
+              <NavLink to="/history" current={location.pathname}>
+                History
               </NavLink>
             </>
           )}

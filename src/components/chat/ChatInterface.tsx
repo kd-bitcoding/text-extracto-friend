@@ -22,7 +22,75 @@ const mockInitialMessages: Message[] = [
   },
 ];
 
-const ChatInterface: React.FC = () => {
+// Mock chat sessions for demonstration
+const mockSessions: Record<string, Message[]> = {
+  "1": [
+    {
+      id: "1-1",
+      content: "I've extracted the text from your receipt. What would you like to know about it?",
+      sender: "ai",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
+    },
+    {
+      id: "1-2",
+      content: "What was the total amount on the receipt?",
+      sender: "user",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2 + 1000 * 60),
+    },
+    {
+      id: "1-3",
+      content: "The total amount on the receipt is $45.67 including tax.",
+      sender: "ai",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2 + 1000 * 60 * 2),
+    },
+  ],
+  "2": [
+    {
+      id: "2-1",
+      content: "I've extracted the text from the business card. What would you like to know about it?",
+      sender: "ai",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
+    },
+    {
+      id: "2-2",
+      content: "What's the email address on this card?",
+      sender: "user",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 + 1000 * 60),
+    },
+    {
+      id: "2-3",
+      content: "The email address on the business card is contact@example.com.",
+      sender: "ai",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 + 1000 * 60 * 2),
+    },
+  ],
+  "3": [
+    {
+      id: "3-1",
+      content: "I've extracted the text from your meeting notes. What would you like to know about it?",
+      sender: "ai",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3),
+    },
+    {
+      id: "3-2",
+      content: "When is the next meeting scheduled?",
+      sender: "user",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3 + 1000 * 60),
+    },
+    {
+      id: "3-3",
+      content: "According to the notes, the next meeting is scheduled for June 15th at 2:00 PM.",
+      sender: "ai",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3 + 1000 * 60 * 2),
+    },
+  ],
+};
+
+interface ChatInterfaceProps {
+  sessionId?: string | null;
+}
+
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ sessionId }) => {
   const [messages, setMessages] = useState<Message[]>(mockInitialMessages);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -36,6 +104,13 @@ const ChatInterface: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+  
+  // Load session messages if sessionId is provided
+  useEffect(() => {
+    if (sessionId && mockSessions[sessionId]) {
+      setMessages(mockSessions[sessionId]);
+    }
+  }, [sessionId]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
