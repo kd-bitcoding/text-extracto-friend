@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,6 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, MessageSquare, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
+// Helper function moved outside of components to be accessible to both
+const formatDate = (date: Date) => {
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) {
+    return "Today";
+  } else if (diffDays === 1) {
+    return "Yesterday";
+  } else {
+    return date.toLocaleDateString();
+  }
+};
 
 // Mock chat session data - would come from API in real app
 const mockChatSessions = [
@@ -56,19 +69,6 @@ const History: React.FC = () => {
   const handleDeleteChat = (sessionId: string) => {
     // Filter out the deleted session
     setSessions(sessions.filter(session => session.id !== sessionId));
-  };
-
-  const formatDate = (date: Date) => {
-    const now = new Date();
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) {
-      return "Today";
-    } else if (diffDays === 1) {
-      return "Yesterday";
-    } else {
-      return date.toLocaleDateString();
-    }
   };
 
   return (
